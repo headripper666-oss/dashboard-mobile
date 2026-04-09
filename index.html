@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Dashboard Mobile</title>
+<style>
+:root{--saphir:#2563EB;--saphir-l:#3b82f6;--jade:#059669;--jade-l:#10b981;--mand:#EA580C;--mand-l:#f97316;--f:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;--tr:160ms cubic-bezier(.16,1,.3,1)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:#0f1117;color:#e2e8f4;font-family:var(--f);font-size:15px;-webkit-font-smoothing:antialiased}
+button{cursor:pointer;border:none;background:none;font:inherit;color:inherit}
+input,textarea,select{font:inherit;color:inherit;background:none}
+
+/* LAYOUT */
+.app{display:flex;flex-direction:column;height:100dvh;height:100vh}
+
+/* TOPBAR */
+.topbar{display:flex;align-items:center;gap:10px;padding:12px 16px;padding-top:calc(12px + env(safe-area-inset-top));background:#161922;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;z-index:10}
+.logo{font-weight:700;font-size:15px;letter-spacing:-.02em;display:flex;align-items:center;gap:7px}
+.proj-sel{flex:1;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:5px 13px;font-size:13px;color:#e2e8f4;outline:none;appearance:none;-webkit-appearance:none;text-align:center;max-width:160px}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#4a5568;flex-shrink:0;transition:background var(--tr)}
+.sync-dot.ok{background:var(--jade)}
+.sync-dot.err{background:var(--mand)}
+.sync-dot.ing{background:var(--saphir);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.btn-icon{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#7e8da8;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);flex-shrink:0}
+.btn-icon:active{background:rgba(255,255,255,.12)}
+
+/* MAIN */
+.main{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+.view{display:none;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom) + 70px)}
+.view.active{display:block}
+
+/* CAPTURE VIEW */
+.capture-card{background:#161922;border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:16px;margin-bottom:14px}
+.capture-type{display:flex;gap:8px;margin-bottom:14px}
+.type-btn{flex:1;padding:9px;border-radius:10px;font-size:13px;font-weight:500;background:rgba(255,255,255,.05);color:#7e8da8;border:1px solid rgba(255,255,255,.08);transition:all var(--tr)}
+.type-btn.active{background:rgba(37,99,235,.15);color:var(--saphir-l);border-color:rgba(37,99,235,.3)}
+.capture-inp{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px 14px;font-size:15px;outline:none;resize:none;min-height:100px;line-height:1.6;transition:border var(--tr);color:#e2e8f4}
+.capture-inp:focus{border-color:var(--saphir)}
+.capture-inp::placeholder{color:#4a5568}
+.capture-foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;gap:10px}
+.capture-phase{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 10px;font-size:12px;color:#7e8da8;outline:none;flex:1;appearance:none;-webkit-appearance:none}
+.btn-send{padding:10px 22px;border-radius:10px;background:var(--saphir);color:#fff;font-size:14px;font-weight:600;border:none;transition:all var(--tr);flex-shrink:0}
+.btn-send:active{background:#1d4ed8;transform:scale(.97)}
+.btn-send:disabled{background:#2d3748;color:#4a5568}
+
+/* RECENT CAPTURES */
+.section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#4a5568;margin-bottom:10px}
+.recent-item{background:#161922;border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+.ri-type{width:6px;border-radius:3px;align-self:stretch;flex-shrink:0;min-height:20px}
+.ri-type.note{background:var(--saphir)}
+.ri-type.task{background:var(--jade)}
+.ri-body{flex:1;min-width:0}
+.ri-title{font-size:14px;color:#e2e8f4;line-height:1.4;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ri-sub{font-size:11px;color:#4a5568}
+
+/* NOTES VIEW */
+.note-entry{background:#161922;border:1px solid rgba(255,255,255,.06);border-radius:14px;overflow:hidden;margin-bottom:8px;transition:border-color var(--tr)}
+.note-entry.open{border-color:rgba(37,99,235,.25)}
+.note-hd{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer;user-select:none}
+.note-arrow{font-size:11px;color:#4a5568;transition:transform var(--tr);flex-shrink:0}
+.note-entry.open .note-arrow{transform:rotate(90deg)}
+.note-ttl{font-size:14px;font-weight:500;color:#e2e8f4;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note-date{font-size:11px;color:#4a5568;flex-shrink:0}
+.note-body{display:none;padding:0 14px 13px;font-size:13px;color:#7e8da8;line-height:1.7;white-space:pre-wrap;border-top:1px solid rgba(255,255,255,.06)}
+.note-entry.open .note-body{display:block;padding-top:10px}
+
+/* TASKS VIEW */
+.phase-group{margin-bottom:20px}
+.phase-lbl{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.phase-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.phase-name{font-size:12px;font-weight:600;color:#7e8da8}
+.task-row{display:flex;align-items:flex-start;gap:11px;padding:11px 14px;background:#161922;border:1px solid rgba(255,255,255,.06);border-radius:12px;margin-bottom:6px;cursor:pointer;user-select:none;transition:background var(--tr)}
+.task-row:active{background:#1c2030}
+.task-chk{width:20px;height:20px;border-radius:5px;border:2px solid rgba(255,255,255,.2);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;transition:all var(--tr)}
+.task-chk.done{background:var(--jade);border-color:var(--jade)}
+.task-chk.done::after{content:'✓';font-size:11px;color:#fff;font-weight:700}
+.task-txt{font-size:14px;color:#e2e8f4;line-height:1.5;flex:1}
+.task-txt.done{text-decoration:line-through;color:#4a5568}
+.task-comment{font-size:11px;color:#4a5568;margin-top:3px;display:none;white-space:pre-wrap;font-family:var(--mono)}
+.task-row.expanded .task-comment{display:block}
+
+/* EMPTY */
+.empty{padding:40px 20px;text-align:center;color:#4a5568;font-size:13px}
+.empty-ico{font-size:32px;margin-bottom:10px;opacity:.5}
+
+/* BOTTOM NAV */
+.bottom-nav{display:flex;background:#161922;border-top:1px solid rgba(255,255,255,.08);padding-bottom:env(safe-area-inset-bottom);flex-shrink:0;position:relative;z-index:10}
+.bnav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 0 8px;font-size:10px;color:#4a5568;transition:color var(--tr);border:none;background:none;cursor:pointer}
+.bnav-btn.active{color:var(--saphir-l)}
+.bnav-btn svg{width:20px;height:20px}
+
+/* TOAST */
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:#161922;border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:9px 16px;font-size:13px;font-weight:500;z-index:200;opacity:0;transition:all .25s cubic-bezier(.16,1,.3,1);pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.ok{color:var(--jade-l);border-color:rgba(5,150,105,.3)}
+.toast.err{color:var(--mand-l);border-color:rgba(234,88,12,.3)}
+
+/* SETTINGS SHEET */
+.sheet-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;opacity:0;pointer-events:none;transition:opacity var(--tr)}
+.sheet-overlay.open{opacity:1;pointer-events:all}
+.sheet{position:fixed;bottom:0;left:0;right:0;background:#161922;border-radius:20px 20px 0 0;border-top:1px solid rgba(255,255,255,.1);padding:20px 20px calc(20px + env(safe-area-inset-bottom));z-index:101;transform:translateY(100%);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+.sheet-overlay.open .sheet{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;background:rgba(255,255,255,.15);border-radius:2px;margin:0 auto 18px}
+.sheet-title{font-size:16px;font-weight:700;margin-bottom:16px}
+.sf{margin-bottom:12px}
+.sf label{display:block;font-size:11px;font-weight:600;color:#7e8da8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px}
+.sf input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:10px;padding:10px 13px;font-size:14px;outline:none;color:#e2e8f4;transition:border var(--tr)}
+.sf input:focus{border-color:var(--saphir)}
+.sf .hint{font-size:11px;color:#4a5568;margin-top:4px}
+.sheet-warn{background:rgba(234,88,12,.1);border:1px solid rgba(234,88,12,.2);border-radius:10px;padding:9px 12px;font-size:11px;color:var(--mand-l);line-height:1.6;margin-bottom:12px}
+.btn-full{width:100%;padding:13px;border-radius:12px;background:var(--saphir);color:#fff;font-size:15px;font-weight:600;border:none;margin-top:6px;transition:all var(--tr)}
+.btn-full:active{background:#1d4ed8;transform:scale(.98)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 28 28" fill="none"><rect width="28" height="28" rx="8" fill="#2563EB"/><circle cx="14" cy="11" r="4" fill="white" opacity=".9"/><rect x="11" y="17" width="6" height="1.5" rx=".75" fill="white" opacity=".7"/><rect x="9" y="20" width="10" height="1.5" rx=".75" fill="white" opacity=".5"/><circle cx="21" cy="7" r="2" fill="#EA580C"/></svg>
+    Mobile
+  </div>
+  <select class="proj-sel" id="projSel"></select>
+  <div class="sync-dot" id="syncDot" title="Statut sync"></div>
+  <button class="btn-icon" id="btnSync" title="Synchroniser">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+  </button>
+  <button class="btn-icon" id="btnSettings" title="Paramètres">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+  </button>
+</div>
+
+<!-- VIEWS -->
+<div class="main">
+
+  <!-- CAPTURE -->
+  <div class="view active" id="view-capture">
+    <div class="capture-card">
+      <div class="capture-type">
+        <button class="type-btn active" data-type="note" id="typeNote">📝 Note</button>
+        <button class="type-btn" data-type="task" id="typeTask">✅ Tâche</button>
+      </div>
+      <textarea class="capture-inp" id="captureInp" placeholder="Saisis ta note ou ta tâche…" rows="4"></textarea>
+      <div class="capture-foot">
+        <select class="capture-phase" id="phaseSel" style="display:none"></select>
+        <div style="flex:1"></div>
+        <button class="btn-send" id="btnSend" disabled>Envoyer</button>
+      </div>
+    </div>
+    <div class="section-title">Récentes</div>
+    <div id="recentList"></div>
+  </div>
+
+  <!-- NOTES -->
+  <div class="view" id="view-notes">
+    <div class="section-title" id="notesTitle">Notes</div>
+    <div id="notesList"></div>
+  </div>
+
+  <!-- TASKS -->
+  <div class="view" id="view-tasks">
+    <div class="section-title" id="tasksTitle">Tâches</div>
+    <div id="tasksList"></div>
+  </div>
+
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="bnav-btn active" data-view="capture">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+    Capturer
+  </button>
+  <button class="bnav-btn" data-view="notes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>
+    Notes
+  </button>
+  <button class="bnav-btn" data-view="tasks">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Tâches
+  </button>
+</nav>
+
+</div><!-- .app -->
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- SETTINGS SHEET -->
+<div class="sheet-overlay" id="sheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title">Synchronisation</div>
+    <div class="sheet-warn">
+      ⚠️ <strong>Token Classic uniquement</strong> — scope <code>gist</code> requis.<br>
+      ✅ Le token reste dans ce navigateur, il n'est <strong>jamais envoyé</strong> dans le Gist.
+    </div>
+    <div class="sf">
+      <label>Token GitHub (Classic)</label>
+      <input type="password" id="setToken" placeholder="ghp_xxxxxxxxxxxxxxxx">
+      <div class="hint"><a href="https://github.com/settings/tokens/new?scopes=gist&description=Dashboard+Mobile" target="_blank" style="color:var(--saphir-l)">→ Créer un token Classic (scope gist)</a></div>
+    </div>
+    <div class="sf">
+      <label>Gist ID <span style="font-weight:400;color:#4a5568">(le même que le dashboard desktop)</span></label>
+      <input type="text" id="setGistId" placeholder="ex: a1b2c3d4e5f6…">
+    </div>
+    <button class="btn-full" id="setConfirm">Enregistrer &amp; Synchroniser</button>
+  </div>
+</div>
+
+<script>
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function makeId(){ return Math.random().toString(36).slice(2,10); }
+
+// ── STATE ──
+var APP = { data:null, curProjId:null, captureType:'note' };
+
+// ── STORAGE ──
+function loadData(){
+  try{ var r=localStorage.getItem('dashboard_v3'); if(r) return JSON.parse(r); }catch(e){}
+  return {version:3,projects:[],practices:[],pracCategories:[],settings:{gistId:'',gistToken:''}};
+}
+function saveData(){ localStorage.setItem('dashboard_v3',JSON.stringify(APP.data)); }
+
+function curProj(){ return APP.data.projects.find(function(p){ return p.id===APP.curProjId; })||APP.data.projects[0]; }
+
+// ── SYNC ──
+function setDot(state){ var d=document.getElementById('syncDot'); d.className='sync-dot'+(state?' '+state:''); }
+
+async function syncPull(silent){
+  var s=APP.data.settings;
+  if(!s.gistToken||!s.gistId){ if(!silent) showToast('Configure token + Gist ID','err'); return false; }
+  setDot('ing');
+  try{
+    var res=await fetch('https://api.github.com/gists/'+s.gistId,{headers:{'Authorization':'token '+s.gistToken,'X-GitHub-Api-Version':'2022-11-28'}});
+    if(res.status===401) throw new Error('Token invalide — token Classic avec scope gist');
+    if(res.status===404) throw new Error('Gist ID introuvable');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    var gist=await res.json();
+    var file=gist.files['dashboard.json']; if(!file) throw new Error('dashboard.json absent du Gist');
+    var remote=JSON.parse(file.content);
+    var localToken=APP.data.settings.gistToken;
+    var localGistId=APP.data.settings.gistId;
+    APP.data=remote;
+    APP.data.settings=APP.data.settings||{};
+    APP.data.settings.gistToken=localToken;
+    APP.data.settings.gistId=localGistId;
+    if(!APP.data.projects) APP.data.projects=[];
+    APP.curProjId=APP.data.projects[0]?APP.data.projects[0].id:null;
+    saveData(); renderAll(); setDot('ok');
+    if(!silent) showToast('Synchronisé ✓','ok');
+    return true;
+  }catch(e){ setDot('err'); if(!silent) showToast(e.message,'err'); return false; }
+}
+
+async function syncPush(){
+  var s=APP.data.settings;
+  if(!s.gistToken||!s.gistId){ showToast('Gist non configuré','err'); return; }
+  setDot('ing');
+  try{
+    var safe=JSON.parse(JSON.stringify(APP.data));
+    delete safe.settings.gistToken; // never push token
+    var res=await fetch('https://api.github.com/gists/'+s.gistId,{method:'PATCH',headers:{'Authorization':'token '+s.gistToken,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:JSON.stringify({files:{'dashboard.json':{content:JSON.stringify(safe,null,2)}}})});
+    if(res.status===401) throw new Error('Token invalide');
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    setDot('ok');
+  }catch(e){ setDot('err'); showToast(e.message,'err'); }
+}
+
+// ── TOAST ──
+function showToast(msg,type){
+  var t=document.getElementById('toast'); t.textContent=msg; t.className='toast show '+(type||'');
+  clearTimeout(t._t); t._t=setTimeout(function(){ t.className='toast'; },2500);
+}
+
+// ── RENDER ──
+function renderProjSel(){
+  var sel=document.getElementById('projSel');
+  var projs=APP.data.projects||[];
+  sel.innerHTML=projs.map(function(p){ return '<option value="'+p.id+'">'+esc(p.icon)+' '+esc(p.name)+'</option>'; }).join('');
+  if(APP.curProjId) sel.value=APP.curProjId;
+}
+
+function renderPhaseSel(){
+  var proj=curProj(); if(!proj) return;
+  var sel=document.getElementById('phaseSel');
+  sel.innerHTML=proj.phases.map(function(ph,i){ return '<option value="'+i+'">'+(i+1)+'. '+esc(ph.name)+'</option>'; }).join('');
+}
+
+function renderRecent(){
+  var proj=curProj();
+  var el=document.getElementById('recentList');
+  if(!proj){ el.innerHTML='<div class="empty"><div class="empty-ico">📋</div>Aucun projet — configure le Gist dans Paramètres</div>'; return; }
+  var items=[];
+  // last 3 notes
+  var notes=(proj.notes||[]).slice(-5).reverse();
+  notes.forEach(function(n){ items.push({type:'note',title:n.title||'Sans titre',sub:proj.name+' · '+n.date}); });
+  // last unchecked tasks
+  proj.phases.forEach(function(ph){
+    ph.tasks.filter(function(t){ return !t.done; }).slice(-3).forEach(function(t){
+      items.push({type:'task',title:t.text,sub:proj.name+' · '+ph.name});
+    });
+  });
+  items=items.slice(0,8);
+  if(!items.length){ el.innerHTML='<div class="empty"><div class="empty-ico">✨</div>Rien de récent</div>'; return; }
+  el.innerHTML=items.map(function(it){
+    return '<div class="recent-item"><div class="ri-type '+it.type+'"></div><div class="ri-body"><div class="ri-title">'+esc(it.title)+'</div><div class="ri-sub">'+esc(it.sub)+'</div></div></div>';
+  }).join('');
+}
+
+function renderNotes(){
+  var proj=curProj();
+  var el=document.getElementById('notesList');
+  var ttl=document.getElementById('notesTitle');
+  if(!proj||!proj.notes||!proj.notes.length){
+    ttl.textContent='Notes';
+    el.innerHTML='<div class="empty"><div class="empty-ico">📝</div>Aucune note pour ce projet</div>';
+    return;
+  }
+  ttl.textContent='Notes — '+proj.name+' ('+proj.notes.length+')';
+  el.innerHTML=proj.notes.slice().reverse().map(function(n,i){
+    return '<div class="note-entry">'
+      +'<div class="note-hd"><span class="note-arrow">▶</span><span class="note-ttl">'+esc(n.title||'Sans titre')+'</span><span class="note-date">'+esc(n.date)+'</span></div>'
+      +'<div class="note-body">'+esc(n.text)+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+function renderTasks(){
+  var proj=curProj();
+  var el=document.getElementById('tasksList');
+  var ttl=document.getElementById('tasksTitle');
+  if(!proj){ el.innerHTML='<div class="empty"><div class="empty-ico">✅</div>Aucun projet</div>'; return; }
+  var total=0,done=0;
+  proj.phases.forEach(function(ph){ total+=ph.tasks.length; done+=ph.tasks.filter(function(t){ return t.done; }).length; });
+  ttl.textContent='Tâches — '+proj.name+' ('+done+'/'+total+')';
+  var html='';
+  proj.phases.forEach(function(ph,pi){
+    if(!ph.tasks.length) return;
+    html+='<div class="phase-group">'
+      +'<div class="phase-lbl"><div class="phase-dot" style="background:'+ph.color+'"></div><span class="phase-name">'+esc(ph.name)+'</span></div>';
+    ph.tasks.forEach(function(t,ti){
+      var hasC=t.comment&&t.comment.trim().length>0;
+      html+='<div class="task-row" data-pi="'+pi+'" data-ti="'+ti+'"'+(hasC?' data-has-c':'')+'>'
+        +'<div class="task-chk'+(t.done?' done':'')+'"></div>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div class="task-txt'+(t.done?' done':'')+'">'+esc(t.text)+'</div>'
+        +(hasC?'<div class="task-comment">'+esc(t.comment)+'</div>':'')
+        +'</div>'
+        +'</div>';
+    });
+    html+='</div>';
+  });
+  if(!html) html='<div class="empty"><div class="empty-ico">🎉</div>Aucune tâche</div>';
+  el.innerHTML=html;
+}
+
+function renderAll(){
+  renderProjSel(); renderPhaseSel(); renderRecent(); renderNotes(); renderTasks();
+  var s=APP.data.settings;
+  setDot(s.gistId&&s.gistToken?'ok':'');
+}
+
+function showView(v){
+  document.querySelectorAll('.view').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.bnav-btn').forEach(function(b){ b.classList.toggle('active',b.dataset.view===v); });
+  var t=document.getElementById('view-'+v); if(t) t.classList.add('active');
+}
+
+// ── CAPTURE TYPE ──
+document.querySelectorAll('.type-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){
+    APP.captureType=btn.dataset.type;
+    document.querySelectorAll('.type-btn').forEach(function(b){ b.classList.toggle('active',b.dataset.type===APP.captureType); });
+    document.getElementById('phaseSel').style.display=APP.captureType==='task'?'block':'none';
+  });
+});
+
+// ── CAPTURE INPUT ──
+document.getElementById('captureInp').addEventListener('input',function(){
+  document.getElementById('btnSend').disabled=!this.value.trim();
+});
+
+// ── SEND ──
+document.getElementById('btnSend').addEventListener('click',async function(){
+  var text=document.getElementById('captureInp').value.trim(); if(!text) return;
+  var proj=curProj(); if(!proj){ showToast('Aucun projet disponible','err'); return; }
+  var now=new Date();
+  var dateStr=now.toLocaleDateString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  if(APP.captureType==='note'){
+    var lines=text.split('\n');
+    var title=lines[0].slice(0,60)||(lines[0])||'Note mobile';
+    proj.notes.push({title:title,text:text,date:dateStr});
+  } else {
+    var pi=+document.getElementById('phaseSel').value||0;
+    proj.phases[pi].tasks.push({text:text,done:false,comment:''});
+    // update phase status
+    var ph=proj.phases[pi];
+    var d=ph.tasks.filter(function(t){ return t.done; }).length;
+    ph.status=d===0?'todo':d===ph.tasks.length?'done':'wip';
+  }
+  saveData(); renderAll();
+  document.getElementById('captureInp').value='';
+  document.getElementById('btnSend').disabled=true;
+  showToast(APP.captureType==='note'?'Note ajoutée ✓':'Tâche ajoutée ✓','ok');
+  await syncPush();
+});
+
+// ── NAV ──
+document.querySelectorAll('.bnav-btn').forEach(function(btn){
+  btn.addEventListener('click',function(){ showView(btn.dataset.view); });
+});
+
+// ── PROJ SELECT ──
+document.getElementById('projSel').addEventListener('change',function(){
+  APP.curProjId=this.value; renderPhaseSel(); renderRecent(); renderNotes(); renderTasks();
+});
+
+// ── NOTES ACCORDION ──
+document.getElementById('notesList').addEventListener('click',function(e){
+  var hd=e.target.closest('.note-hd'); if(!hd) return;
+  hd.closest('.note-entry').classList.toggle('open');
+});
+
+// ── TASKS TOGGLE ──
+document.getElementById('tasksList').addEventListener('click',function(e){
+  var row=e.target.closest('.task-row'); if(!row) return;
+  // expand comment on second tap, toggle done on checkbox area
+  var chk=e.target.closest('.task-chk');
+  if(chk){
+    var proj=curProj(); if(!proj) return;
+    var pi=+row.dataset.pi, ti=+row.dataset.ti;
+    proj.phases[pi].tasks[ti].done=!proj.phases[pi].tasks[ti].done;
+    var ph=proj.phases[pi];
+    var d=ph.tasks.filter(function(t){ return t.done; }).length;
+    ph.status=d===0?'todo':d===ph.tasks.length?'done':'wip';
+    saveData(); renderTasks(); syncPush();
+  } else if(row.dataset.hasC!==undefined){
+    row.classList.toggle('expanded');
+  }
+});
+
+// ── SYNC BUTTON ──
+document.getElementById('btnSync').addEventListener('click',function(){ syncPull(false); });
+
+// ── SETTINGS SHEET ──
+document.getElementById('btnSettings').addEventListener('click',function(){
+  document.getElementById('setToken').value=APP.data.settings.gistToken||'';
+  document.getElementById('setGistId').value=APP.data.settings.gistId||'';
+  document.getElementById('sheetOverlay').classList.add('open');
+});
+document.getElementById('sheetOverlay').addEventListener('click',function(e){
+  if(e.target===this) this.classList.remove('open');
+});
+document.getElementById('setConfirm').addEventListener('click',async function(){
+  var token=document.getElementById('setToken').value.trim();
+  var gistId=document.getElementById('setGistId').value.trim();
+  if(!token){ showToast('Token requis','err'); return; }
+  APP.data.settings.gistToken=token;
+  APP.data.settings.gistId=gistId;
+  saveData();
+  document.getElementById('sheetOverlay').classList.remove('open');
+  // Pull if gistId exists, else show toast
+  if(gistId){ await syncPull(false); }
+  else { showToast('Token sauvegardé. Renseigne le Gist ID du dashboard','err'); }
+});
+
+// ── INIT ──
+APP.data=loadData();
+APP.curProjId=APP.data.projects[0]?APP.data.projects[0].id:null;
+renderAll();
+// Auto-pull on start if configured
+if(APP.data.settings.gistToken&&APP.data.settings.gistId){ syncPull(true); }
+</script>
+</body>
+</html>
