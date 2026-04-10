@@ -26,6 +26,8 @@ input,textarea,select{font:inherit;color:inherit;background:none}
 .sync-dot.err{background:var(--mand)}
 .sync-dot.ing{background:var(--saphir);animation:pulse 1s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.btn-icon.syncing svg{animation:spin 0.75s linear infinite;transform-origin:center;}
 .btn-icon{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#7e8da8;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);flex-shrink:0}
 .btn-icon:active{background:rgba(255,255,255,.12)}
 
@@ -128,7 +130,7 @@ input,textarea,select{font:inherit;color:inherit;background:none}
   </div>
   <select class="proj-sel" id="projSel"></select>
   <div class="sync-dot" id="syncDot" title="Statut sync"></div>
-  <button class="btn-icon" id="btnSync" title="Synchroniser">
+  <button class="btn-icon" id="btnSync" title="Télécharger depuis Gist (Pull)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
   </button>
   <button class="btn-icon" id="btnSettings" title="Paramètres">
@@ -212,6 +214,18 @@ input,textarea,select{font:inherit;color:inherit;background:none}
     </div>
     <button class="btn-full" id="setConfirm">Enregistrer &amp; Synchroniser</button>
   </div>
+
+<!-- SYNC CONFIRM SHEET -->
+<div class="sheet-overlay" id="syncSheetOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-title" id="syncSheetTitle">Synchronisation</div>
+    <div id="syncSheetBody"></div>
+    <button class="btn-full" id="syncSheetYes" style="margin-top:4px">Confirmer</button>
+    <button class="btn-full" id="syncSheetNo" style="background:rgba(255,255,255,.05);color:#7e8da8;margin-top:8px">Annuler</button>
+  </div>
+</div>
+
 </div>
 
 <script>
@@ -226,12 +240,18 @@ function loadData(){
   try{ var r=localStorage.getItem('dashboard_v3'); if(r) return JSON.parse(r); }catch(e){}
   return {version:3,projects:[],practices:[],pracCategories:[],settings:{gistId:'',gistToken:''}};
 }
-function saveData(){ localStorage.setItem('dashboard_v3',JSON.stringify(APP.data)); }
+function saveData(){ APP.data.lastLocalSave=new Date().toISOString(); localStorage.setItem('dashboard_v3',JSON.stringify(APP.data)); }
 
 function curProj(){ return APP.data.projects.find(function(p){ return p.id===APP.curProjId; })||APP.data.projects[0]; }
 
 // ── SYNC ──
-function setDot(state){ var d=document.getElementById('syncDot'); d.className='sync-dot'+(state?' '+state:''); }
+function setDot(state){
+  var d=document.getElementById('syncDot');
+  d.className='sync-dot'+(state?' '+state:'');
+  var btn=document.getElementById('btnSync');
+  if(state==='ing') btn.classList.add('syncing');
+  else btn.classList.remove('syncing');
+}
 
 async function syncPull(silent){
   var s=APP.data.settings;
@@ -253,6 +273,7 @@ async function syncPull(silent){
     APP.data.settings.gistId=localGistId;
     if(!APP.data.projects) APP.data.projects=[];
     APP.curProjId=APP.data.projects[0]?APP.data.projects[0].id:null;
+    APP.data.lastGistSync=gist.updated_at||new Date().toISOString();
     saveData(); renderAll(); setDot('ok');
     if(!silent) showToast('Synchronisé ✓','ok');
     return true;
@@ -269,6 +290,9 @@ async function syncPush(){
     var res=await fetch('https://api.github.com/gists/'+s.gistId,{method:'PATCH',headers:{'Authorization':'token '+s.gistToken,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:JSON.stringify({files:{'dashboard.json':{content:JSON.stringify(safe,null,2)}}})});
     if(res.status===401) throw new Error('Token invalide');
     if(!res.ok) throw new Error('HTTP '+res.status);
+    var gist=await res.json();
+    APP.data.lastGistSync=gist.updated_at||new Date().toISOString();
+    saveData();
     setDot('ok');
   }catch(e){ setDot('err'); showToast(e.message,'err'); }
 }
@@ -447,7 +471,11 @@ document.getElementById('tasksList').addEventListener('click',function(e){
 });
 
 // ── SYNC BUTTON ──
-document.getElementById('btnSync').addEventListener('click',function(){ syncPull(false); });
+document.getElementById('btnSync').addEventListener('click',function(){
+  var s=APP.data.settings;
+  if(!s.gistToken||!s.gistId){ showToast('Configure token + Gist ID','err'); return; }
+  showSyncSheet('pull');
+});
 
 // ── SETTINGS SHEET ──
 document.getElementById('btnSettings').addEventListener('click',function(){
@@ -476,7 +504,61 @@ APP.data=loadData();
 APP.curProjId=APP.data.projects[0]?APP.data.projects[0].id:null;
 renderAll();
 // Auto-pull on start if configured
-if(APP.data.settings.gistToken&&APP.data.settings.gistId){ syncPull(true); }
+if(APP.data.settings&&APP.data.settings.gistToken&&APP.data.settings.gistId){
+  setTimeout(function(){ showSyncSheet('pull'); },700);
+}
+window.addEventListener('beforeunload',function(e){
+  if(!APP.data||!APP.data.settings) return;
+  var s=APP.data.settings;
+  if(s.gistToken&&s.gistId&&isDirty()){ e.preventDefault(); e.returnValue='Données non synchronisées avec GitHub Gist.'; }
+});
+
+// ── SYNC HELPERS ──
+function fmtDate(iso){ if(!iso) return 'Jamais'; return new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function isDirty(){ var l=APP.data.lastLocalSave,g=APP.data.lastGistSync; return l&&(!g||l>g); }
+var _syncPending=null;
+
+async function showSyncSheet(action){
+  _syncPending=action;
+  var s=APP.data.settings;
+  var localDate=fmtDate(APP.data.lastLocalSave);
+  var gistDate=fmtDate(APP.data.lastGistSync);
+  if(s.gistToken&&s.gistId){
+    try{
+      var r=await fetch('https://api.github.com/gists/'+s.gistId,{headers:{'Authorization':'token '+s.gistToken,'X-GitHub-Api-Version':'2022-11-28'}});
+      if(r.ok){ var g=await r.json(); gistDate=fmtDate(g.updated_at); }
+    }catch(e){}
+  }
+  document.getElementById('syncSheetTitle').textContent=action==='push'?'📤 Pousser vers Gist':'📥 Récupérer depuis Gist';
+  document.getElementById('syncSheetBody').innerHTML=
+    '<div style="background:rgba(255,255,255,.05);border-radius:10px;padding:14px 16px;margin-bottom:14px">'+
+    '<div style="margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">'+
+    '<span style="font-size:11px;color:#4a5568;text-transform:uppercase;letter-spacing:.06em">💾 Sauvegarde locale</span>'+
+    '<strong style="color:#e2e8f4;font-size:13px">'+localDate+'</strong></div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center">'+
+    '<span style="font-size:11px;color:#4a5568;text-transform:uppercase;letter-spacing:.06em">☁️ Dernier sync Gist</span>'+
+    '<strong style="color:#e2e8f4;font-size:13px">'+gistDate+'</strong></div></div>'+
+    '<div style="font-size:12px;color:#7e8da8;line-height:1.6">'+
+    (action==='push'
+      ? '⚠️ Les données locales vont <strong style="color:#e2e8f4">écraser</strong> le Gist.'
+      : '⚠️ Les données du Gist vont <strong style="color:#e2e8f4">écraser</strong> les données locales.'
+    )+'</div>';
+  document.getElementById('syncSheetOverlay').classList.add('open');
+}
+
+document.getElementById('syncSheetYes').addEventListener('click',function(){
+  document.getElementById('syncSheetOverlay').classList.remove('open');
+  if(_syncPending==='push') syncPush();
+  else if(_syncPending==='pull') syncPull(false);
+  _syncPending=null;
+});
+document.getElementById('syncSheetNo').addEventListener('click',function(){
+  document.getElementById('syncSheetOverlay').classList.remove('open');
+  _syncPending=null;
+});
+document.getElementById('syncSheetOverlay').addEventListener('click',function(e){
+  if(e.target===this){ this.classList.remove('open'); _syncPending=null; }
+});
 </script>
 </body>
 </html>
